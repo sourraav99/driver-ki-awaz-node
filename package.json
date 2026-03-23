@@ -1,0 +1,14 @@
+{
+  "name": "awaz-feed",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.22.1",
+    "fluent-ffmpeg": "^2.1.3",
+    "multer": "^2.0.2",
+    "mysql2": "^3.16.1"
+  }
+}
