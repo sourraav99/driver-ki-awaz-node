@@ -23,6 +23,16 @@ app.use("/api/upload", uploadRoutes);
 // Initialize Video Worker
 require("./services/videoQueue.service");
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error("GLOBAL ERROR:", err.stack);
+  res.status(500).json({
+    success: false,
+    message: "An unexpected error occurred",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined
+  });
+});
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log("Server running on port " + port);

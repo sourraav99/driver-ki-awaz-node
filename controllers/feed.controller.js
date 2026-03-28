@@ -240,61 +240,86 @@ exports.getPostById = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("GET POST ERROR:", error);
     res.status(500).json({
       success: false,
-      message: "Server error"
+      message: "Server error while fetching post",
+      error: error.message
     });
   }
 };
 
 
 exports.getFeed = async (req, res) => {
-  const userId = req.headers["x-user-id"] || 0;
-  const { cursor, id, type } = req.query; // type added
+  try {
+    const userId = req.headers["x-user-id"] || 0;
+    const { cursor, id, type } = req.query; // type added
 
-  const feed = await feedService.getFeed(userId, cursor, id, type);
+    const feed = await feedService.getFeed(userId, cursor, id, type);
 
-  let nextCursor = null;
-  let nextId = null;
+    let nextCursor = null;
+    let nextId = null;
 
-  if (feed.length) {
-    const lastPost = feed[feed.length - 1];
-    nextCursor = lastPost.created_at;
-    nextId = lastPost.id;
+    if (feed.length) {
+      const lastPost = feed[feed.length - 1];
+      nextCursor = lastPost.created_at;
+      nextId = lastPost.id;
+    }
+
+    res.json({
+      data: feed,
+      nextCursor,
+      nextId,
+      hasMore: feed.length === 5
+    });
+  } catch (error) {
+    console.error("GET FEED ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching feed",
+      error: error.message
+    });
   }
-
-  res.json({
-    data: feed,
-    nextCursor,
-    nextId,
-    hasMore: feed.length === 5
-  });
 };
 
 exports.likeUnlike = async (req, res) => {
-  const userId = req.headers["x-user-id"];
-  const { postId } = req.params;
+  try {
+    const userId = req.headers["x-user-id"];
+    const { postId } = req.params;
 
-  const result = await feedService.likeUnlike(userId, postId);
-  res.json(result);
+    const result = await feedService.likeUnlike(userId, postId);
+    res.json(result);
+  } catch (error) {
+    console.error("LIKE/UNLIKE ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 exports.comment = async (req, res) => {
-  const userId = req.headers["x-user-id"];
-  const { comment } = req.body;
-  const { postId } = req.params;
+  try {
+    const userId = req.headers["x-user-id"];
+    const { comment } = req.body;
+    const { postId } = req.params;
 
-  await feedService.comment(userId, postId, comment);
-  res.json({ message: "Comment added" });
+    await feedService.comment(userId, postId, comment);
+    res.json({ message: "Comment added" });
+  } catch (error) {
+    console.error("COMMENT ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 exports.share = async (req, res) => {
-  const userId = req.headers["x-user-id"];
-  const { postId } = req.params;
+  try {
+    const userId = req.headers["x-user-id"];
+    const { postId } = req.params;
 
-  await feedService.share(userId, postId);
-  res.json({ message: "Post shared" });
+    await feedService.share(userId, postId);
+    res.json({ message: "Post shared" });
+  } catch (error) {
+    console.error("SHARE ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 
@@ -353,11 +378,16 @@ exports.editPost = async (req, res) => {
 
 
 exports.deletePost = async (req, res) => {
-  const userId = req.headers["x-user-id"];
-  const { postId } = req.params;
+  try {
+    const userId = req.headers["x-user-id"];
+    const { postId } = req.params;
 
-  await feedService.deletePost(userId, postId);
-  res.json({ message: "Post deleted" });
+    await feedService.deletePost(userId, postId);
+    res.json({ message: "Post deleted" });
+  } catch (error) {
+    console.error("DELETE POST ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 /*
@@ -401,20 +431,25 @@ exports.userFeed = async (req, res) => {
 
     res.json(feed);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Something went wrong." });
+    console.error("USER FEED ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 
 
 exports.getComments = async (req, res) => {
-  const userId = req.headers["x-user-id"] || 0;
-  const { postId } = req.params;
-  const { cursor, id } = req.query;
+  try {
+    const userId = req.headers["x-user-id"] || 0;
+    const { postId } = req.params;
+    const { cursor, id } = req.query;
 
-  const comments = await feedService.getComments(userId, postId, cursor, id);
-  res.json(comments);
+    const comments = await feedService.getComments(userId, postId, cursor, id);
+    res.json(comments);
+  } catch (error) {
+    console.error("GET COMMENTS ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 
