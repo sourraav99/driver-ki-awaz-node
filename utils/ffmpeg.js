@@ -10,18 +10,11 @@ exports.convertToHLS = (inputVideo, outputFolder, callback) => {
     fs.mkdirSync(outputFolder, { recursive: true });
   }
 
-  const command = `
-  ${ffmpeg} -i ${inputVideo} \
-  -c:v libx264 \
-  -c:a aac \
-  -hls_time 4 \
-  -hls_list_size 0 \
-  -f hls ${outputFolder}/index.m3u8
-  `;
+  const command = `"${ffmpeg}" -i "${inputVideo}" -c:v libx264 -c:a aac -hls_time 4 -hls_list_size 0 -f hls "${outputFolder}/index.m3u8"`;
 
   exec(command, (err) => {
     if (err) {
-      console.log("FFmpeg error:", err);
+      console.error("FFmpeg error:", err);
       if (callback) callback(err);
     } else {
       console.log("HLS conversion complete");

@@ -5,7 +5,7 @@ const path = require("path");
 const { convertToHLS } = require("../utils/ffmpeg");
 const ffmpeg = require("fluent-ffmpeg");
 const db = require("./db");
-const { v4: uuidv4 } = require("uuid");
+const { pipeline } = require("stream/promises");
 
 exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) => {
     const tempDir = path.join(__dirname, "../tmp", uploadId);
@@ -24,12 +24,9 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
             Key: s3Key,
         });
         const { Body } = await s3Client.send(getCommand);
-        await new Promise((resolve, reject) => {
-            const writer = fs.createWriteStream(localVideoPath);
-            Body.pipe(writer);
-            writer.on("finish", resolve);
-            writer.on("error", reject);
-        });
+        
+        // Safer stream handling with pipeline
+        await pipeline(Body, fs.createWriteStream(localVideoPath));
 
         // 2. Generate Thumbnail IF NOT provided by frontend
         let finalThumbnailUrl = thumbnailUrl;
@@ -44,7 +41,10 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
                         size: "320x240",
                     })
                     .on("end", resolve)
-                    .on("error", reject);
+                    .on("error", (err) => {
+                        console.error("[Worker] Thumbnail generation error:", err);
+                        reject(err);
+                    });
             });
         }
 
@@ -54,7 +54,8 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
         // 4. Upload HLS & Thumbnail (if generated) back to S3
         const hlsFiles = fs.readdirSync(hlsFolder);
         const uploadPromises = hlsFiles.map(async (file) => {
-            const fileStream = fs.createReadStream(path.join(hlsFolder, file));
+            const filePath = path.join(hlsFolder, file);
+            const fileStream = fs.createReadStream(filePath);
             const putCommand = new PutObjectCommand({
                 Bucket: process.env.AWS_S3_BUCKET,
                 Key: `processed/${uploadId}/hls/${file}`,
@@ -97,12 +98,14 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
         await db.query(
             "UPDATE posts SET processing_status = 'failed' WHERE media_url = ?",
             [originalLocation]
-        );
+        ).catch(e => console.error("[Worker] DB Update Failed (posts):", e));
+        
         await db.query(
             "UPDATE upload_sessions SET status = 'failed' WHERE id = ?",
             [uploadId]
-        );
-        throw error; // Important: Re-throw so BullMQ knows it failed and can retry
+        ).catch(e => console.error("[Worker] DB Update Failed (sessions):", e));
+        
+        throw error; 
     } finally {
         // Cleanup temp files
         fs.rmSync(tempDir, { recursive: true, force: true });
@@ -111,10 +114,7 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
 
 // Simple wrapper for convertToHLS to make it awaitable
 function convertToHLSAsync(input, output) {
-    const { convertToHLS } = require("../utils/ffmpeg");
     return new Promise((resolve, reject) => {
-        // We need to modify utils/ffmpeg.js to have a callback or return a promise
-        // For now, let's assume it works or we'll modify it next
         convertToHLS(input, output, (err) => {
             if (err) reject(err);
             else resolve();

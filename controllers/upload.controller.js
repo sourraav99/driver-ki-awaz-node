@@ -2,6 +2,7 @@ const { CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUpload
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const s3Client = require("../config/s3");
 const uploadService = require("../services/upload.service");
+const feedService = require("../services/feed.service");
 const { videoQueue } = require("../services/videoQueue.service");
 const { v4: uuidv4 } = require("uuid");
 
@@ -92,9 +93,6 @@ exports.completeUpload = async (req, res) => {
         // We will store the S3 URL as the initial media_url
         const initialMediaUrl = Location; 
         
-        // Use feedService to create the post
-        const feedService = require("../services/feed.service");
-        // We'll add a temporary "processing" status if the table structure allows or just use the current one
         // If thumbnailUrl is provided by frontend, we use it, otherwise NULL
         await feedService.createPost(userId, "video", initialMediaUrl, caption, category, thumbnailUrl || null);
 
