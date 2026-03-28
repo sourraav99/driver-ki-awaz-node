@@ -2,8 +2,8 @@ const db = require("../config/db");
 
 exports.createPost = async (userId, media_type, media_url, caption, category, thumbnail) => {
   await db.query(
-    "INSERT INTO posts (user_id, media_type, media_url, caption, category, thumbnail) VALUES (?, ?, ?, ?, ?, ?)",
-    [userId, media_type, media_url, caption, category, thumbnail]
+    "INSERT INTO posts (user_id, media_type, media_url, caption, category, thumbnail, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [userId, media_type, media_url, caption, category, thumbnail, 1]
   );
 };
 

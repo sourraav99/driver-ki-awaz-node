@@ -4,7 +4,7 @@ const fs = require("fs");
 // const ffmpeg = "/home/jrdumdat/ffmpeg-7.0.2-amd64-static/ffmpeg";
 const ffmpeg = "ffmpeg";
 
-exports.convertToHLS = (inputVideo, outputFolder) => {
+exports.convertToHLS = (inputVideo, outputFolder, callback) => {
 
   if (!fs.existsSync(outputFolder)) {
     fs.mkdirSync(outputFolder, { recursive: true });
@@ -22,8 +22,10 @@ exports.convertToHLS = (inputVideo, outputFolder) => {
   exec(command, (err) => {
     if (err) {
       console.log("FFmpeg error:", err);
+      if (callback) callback(err);
     } else {
       console.log("HLS conversion complete");
+      if (callback) callback(null);
     }
   });
 };

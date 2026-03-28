@@ -4,6 +4,7 @@ const path = require("path");
 
 const feedRoutes = require("./routes/feed.routes");
 const userRoutes = require("./routes/user.routes");
+const uploadRoutes = require("./routes/upload.routes");
 
 
 const app = express();
@@ -17,6 +18,10 @@ app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 // routes
 app.use("/api/feed", feedRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/upload", uploadRoutes);
+
+// Initialize Video Worker
+require("./services/videoQueue.service");
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
