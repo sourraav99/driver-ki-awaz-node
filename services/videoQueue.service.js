@@ -11,11 +11,11 @@ const videoQueue = new Queue("video-processing", {
 const videoWorker = new Worker(
     "video-processing",
     async (job) => {
-        const { uploadId, s3Key, originalLocation } = job.data;
+        const { uploadId, s3Key, originalLocation, thumbnailUrl } = job.data;
         console.log(`[Worker] Started processing job ${job.id} (Attempt ${job.attemptsMade + 1}) for ${uploadId}`);
         
         try {
-            await processVideo(uploadId, s3Key, originalLocation);
+            await processVideo(uploadId, s3Key, originalLocation, thumbnailUrl);
             console.log(`[Worker] Successfully completed job ${job.id}`);
         } catch (error) {
             console.error(`[Worker] Job ${job.id} FAILED:`, error);

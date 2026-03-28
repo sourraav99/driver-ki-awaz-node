@@ -61,7 +61,7 @@ exports.initUpload = async (req, res) => {
 exports.completeUpload = async (req, res) => {
     try {
         const userId = req.headers["x-user-id"];
-        const { uploadId, s3UploadId, parts, caption, category } = req.body;
+        const { uploadId, s3UploadId, parts, caption, category, thumbnailUrl } = req.body;
 
         if (!userId || !uploadId || !s3UploadId || !parts || !parts.length) {
             return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -95,13 +95,15 @@ exports.completeUpload = async (req, res) => {
         // Use feedService to create the post
         const feedService = require("../services/feed.service");
         // We'll add a temporary "processing" status if the table structure allows or just use the current one
-        await feedService.createPost(userId, "video", initialMediaUrl, caption, category, null);
+        // If thumbnailUrl is provided by frontend, we use it, otherwise NULL
+        await feedService.createPost(userId, "video", initialMediaUrl, caption, category, thumbnailUrl || null);
 
         // Trigger Background Processing via Queue with 3 retries
         await videoQueue.add("process-video", {
             uploadId,
             s3Key,
             originalLocation: Location,
+            thumbnailUrl, // Pass to worker
         }, {
             attempts: 3,
             backoff: {

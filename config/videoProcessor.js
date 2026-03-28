@@ -7,7 +7,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const db = require("./db");
 const { v4: uuidv4 } = require("uuid");
 
-exports.processVideo = async (uploadId, s3Key, originalLocation) => {
+exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) => {
     const tempDir = path.join(__dirname, "../tmp", uploadId);
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
@@ -31,23 +31,27 @@ exports.processVideo = async (uploadId, s3Key, originalLocation) => {
             writer.on("error", reject);
         });
 
-        // 2. Generate Thumbnail
-        await new Promise((resolve, reject) => {
-            ffmpeg(localVideoPath)
-                .screenshots({
-                    timestamps: ["1"],
-                    filename: "thumbnail.jpg",
-                    folder: tempDir,
-                    size: "320x240",
-                })
-                .on("end", resolve)
-                .on("error", reject);
-        });
+        // 2. Generate Thumbnail IF NOT provided by frontend
+        let finalThumbnailUrl = thumbnailUrl;
+        if (!finalThumbnailUrl) {
+            console.log(`[Worker] No thumbnail provided, generating one...`);
+            await new Promise((resolve, reject) => {
+                ffmpeg(localVideoPath)
+                    .screenshots({
+                        timestamps: ["1"],
+                        filename: "thumbnail.jpg",
+                        folder: tempDir,
+                        size: "320x240",
+                    })
+                    .on("end", resolve)
+                    .on("error", reject);
+            });
+        }
 
-        // 3. Convert to HLS (using existing utility but modified to be awaitable)
+        // 3. Convert to HLS
         await convertToHLSAsync(localVideoPath, hlsFolder);
 
-        // 4. Upload HLS & Thumbnail back to S3
+        // 4. Upload HLS & Thumbnail (if generated) back to S3
         const hlsFiles = fs.readdirSync(hlsFolder);
         const uploadPromises = hlsFiles.map(async (file) => {
             const fileStream = fs.createReadStream(path.join(hlsFolder, file));
@@ -60,19 +64,21 @@ exports.processVideo = async (uploadId, s3Key, originalLocation) => {
             return s3Client.send(putCommand);
         });
 
-        const thumbnailStream = fs.createReadStream(thumbnailPath);
-        uploadPromises.push(s3Client.send(new PutObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: `processed/${uploadId}/thumbnail.jpg`,
-            Body: thumbnailStream,
-            ContentType: "image/jpeg",
-        })));
+        if (!thumbnailUrl) {
+            const thumbnailStream = fs.createReadStream(thumbnailPath);
+            uploadPromises.push(s3Client.send(new PutObjectCommand({
+                Bucket: process.env.AWS_S3_BUCKET,
+                Key: `processed/${uploadId}/thumbnail.jpg`,
+                Body: thumbnailStream,
+                ContentType: "image/jpeg",
+            })));
+            finalThumbnailUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/processed/${uploadId}/thumbnail.jpg`;
+        }
 
         await Promise.all(uploadPromises);
 
         // 5. Update DB
         const finalMediaUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/processed/${uploadId}/hls/index.m3u8`;
-        const finalThumbnailUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/processed/${uploadId}/thumbnail.jpg`;
 
         await db.query(
             "UPDATE posts SET media_url = ?, thumbnail = ?, processing_status = 'ready' WHERE media_url = ?",
