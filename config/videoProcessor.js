@@ -13,7 +13,7 @@ console.log("FFmpeg prob path:", ffprobeInstaller.path);
 const db = require("./db");
 const { pipeline } = require("stream/promises");
 
-exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) => {
+exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl, isLastAttempt = false) => {
     const tempDir = path.join(__dirname, "../tmp", uploadId);
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
@@ -22,7 +22,7 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
     const thumbnailPath = path.join(tempDir, "thumbnail.jpg");
 
     try {
-        console.log(`[Worker] Starting processing for ${uploadId}...`);
+        console.log(`[Worker] Starting processing for ${uploadId}... (IsLastAttempt: ${isLastAttempt})`);
 
         // 1. Download original from S3
         const getCommand = new GetObjectCommand({
@@ -101,17 +101,21 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
 
     } catch (error) {
         console.error(`[Worker] Processing FAILED for ${uploadId}:`, error);
-        await db.query(
-            "UPDATE posts SET processing_status = 'failed' WHERE media_url = ?",
-            [originalLocation]
-        ).catch(e => console.error("[Worker] DB Update Failed (posts):", e));
+        
+        // Only mark status as 'failed' in DB if we are on the last attempt
+        if (isLastAttempt) {
+            await db.query(
+                "UPDATE posts SET processing_status = 'failed' WHERE media_url = ?",
+                [originalLocation]
+            ).catch(e => console.error("[Worker] DB Update Failed (posts):", e));
 
-        await db.query(
-            "UPDATE upload_sessions SET status = 'failed' WHERE uploadId = ?",
-            [uploadId]
-        ).catch(e => console.error("[Worker] DB Update Failed (sessions):", e));
+            await db.query(
+                "UPDATE upload_sessions SET status = 'failed' WHERE uploadId = ?",
+                [uploadId]
+            ).catch(e => console.error("[Worker] DB Update Failed (sessions):", e));
+        }
 
-        throw error;
+        throw error; // Throw so BullMQ can trigger retry if attempts remain
     } finally {
         // Cleanup temp files
         fs.rmSync(tempDir, { recursive: true, force: true });

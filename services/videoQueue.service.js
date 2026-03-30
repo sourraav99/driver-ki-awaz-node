@@ -12,10 +12,17 @@ const videoWorker = new Worker(
     "video-processing",
     async (job) => {
         const { uploadId, s3Key, originalLocation, thumbnailUrl } = job.data;
-        console.log(`[Worker] Started processing job ${job.id} (Attempt ${job.attemptsMade + 1}) for ${uploadId}`);
+        
+        // Calculate if this is the last allowed attempt
+        // job.attemptsMade starts at 0 for the first attempt.
+        // If attempts: 3, then it's the last attempt when attemptsMade is 2.
+        const maxAttempts = job.opts.attempts || 1;
+        const isLastAttempt = (job.attemptsMade + 1) >= maxAttempts;
+
+        console.log(`[Worker] Started processing job ${job.id} (Attempt ${job.attemptsMade + 1}/${maxAttempts}) for ${uploadId}`);
         
         try {
-            await processVideo(uploadId, s3Key, originalLocation, thumbnailUrl);
+            await processVideo(uploadId, s3Key, originalLocation, thumbnailUrl, isLastAttempt);
             console.log(`[Worker] Successfully completed job ${job.id}`);
         } catch (error) {
             console.error(`[Worker] Job ${job.id} FAILED:`, error);
