@@ -24,7 +24,7 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
             Key: s3Key,
         });
         const { Body } = await s3Client.send(getCommand);
-        
+
         // Safer stream handling with pipeline
         await pipeline(Body, fs.createWriteStream(localVideoPath));
 
@@ -85,9 +85,9 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
             "UPDATE posts SET media_url = ?, thumbnail = ?, processing_status = 'ready' WHERE media_url = ?",
             [finalMediaUrl, finalThumbnailUrl, originalLocation]
         );
-        
+
         await db.query(
-            "UPDATE upload_sessions SET status = 'completed' WHERE id = ?",
+            "UPDATE upload_sessions SET status = 'completed' WHERE uploadId = ?",
             [uploadId]
         );
 
@@ -99,13 +99,13 @@ exports.processVideo = async (uploadId, s3Key, originalLocation, thumbnailUrl) =
             "UPDATE posts SET processing_status = 'failed' WHERE media_url = ?",
             [originalLocation]
         ).catch(e => console.error("[Worker] DB Update Failed (posts):", e));
-        
+
         await db.query(
-            "UPDATE upload_sessions SET status = 'failed' WHERE id = ?",
+            "UPDATE upload_sessions SET status = 'failed' WHERE uploadId = ?",
             [uploadId]
         ).catch(e => console.error("[Worker] DB Update Failed (sessions):", e));
-        
-        throw error; 
+
+        throw error;
     } finally {
         // Cleanup temp files
         fs.rmSync(tempDir, { recursive: true, force: true });

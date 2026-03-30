@@ -28,8 +28,9 @@ exports.initUpload = async (req, res) => {
 
         const { UploadId } = await s3Client.send(command);
 
-        // Store S3 UploadId in our session table (optional, but good for completion)
         await uploadService.createUploadSession(uploadId, userId, fileName, fileSize, totalChunks);
+        
+        console.log("DEBUG: Initialized upload session with ID:", uploadId);
 
         const presignedUrls = [];
         for (let i = 1; i <= totalChunks; i++) {
@@ -63,12 +64,15 @@ exports.completeUpload = async (req, res) => {
     try {
         const userId = req.headers["x-user-id"];
         const { uploadId, s3UploadId, parts, caption, category, thumbnailUrl } = req.body;
+        
+        console.log("DEBUG: Received uploadId:", uploadId);
 
         if (!userId || !uploadId || !s3UploadId || !parts || !parts.length) {
             return res.status(400).json({ success: false, message: "Missing required fields" });
         }
 
         const session = await uploadService.getUploadSession(uploadId);
+        console.log("DEBUG: Found session result:", session);
         if (!session) {
             return res.status(404).json({ success: false, message: "Upload session not found" });
         }
