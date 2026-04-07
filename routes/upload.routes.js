@@ -4,6 +4,7 @@ const uploadController = require("../controllers/upload.controller");
 
 router.post("/init", uploadController.initUpload);
 router.post("/complete", uploadController.completeUpload);
+router.post("/retry", uploadController.retryUpload);
 router.post("/thumbnail-presigned", uploadController.getThumbnailPresignedUrl);
 
 module.exports = router;

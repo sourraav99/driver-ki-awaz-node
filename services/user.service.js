@@ -17,7 +17,6 @@ exports.getUserDashboard = async (viewerId, userId) => {
       ) AS is_liked
     FROM posts p
     WHERE p.user_id=?
-    AND (p.processing_status IS NULL OR p.processing_status != 'failed')
     ORDER BY p.created_at DESC
     `,
     [viewerId, userId]

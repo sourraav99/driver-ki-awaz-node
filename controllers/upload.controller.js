@@ -3,7 +3,7 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const s3Client = require("../config/s3");
 const uploadService = require("../services/upload.service");
 const feedService = require("../services/feed.service");
-const { videoQueue } = require("../services/videoQueue.service");
+const { videoQueue, MAX_ATTEMPTS } = require("../services/videoQueue.service");
 const { v4: uuidv4 } = require("uuid");
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
@@ -94,7 +94,7 @@ exports.completeUpload = async (req, res) => {
         const initialMediaUrl = Location; 
         
         // If thumbnailUrl is provided by frontend, we use it, otherwise NULL
-        await feedService.createPost(userId, "video", initialMediaUrl, caption, category, thumbnailUrl || null);
+        await feedService.createPost(userId, "video", initialMediaUrl, caption, category, thumbnailUrl || null, uploadId);
 
         // Trigger Background Processing via Queue with 3 retries
         await videoQueue.add("process-video", {
@@ -103,7 +103,7 @@ exports.completeUpload = async (req, res) => {
             originalLocation: Location,
             thumbnailUrl, // Pass to worker
         }, {
-            attempts: 3,
+            attempts: MAX_ATTEMPTS,
             backoff: {
                 type: "exponential",
                 delay: 5000, // Wait 5s, then 10s, then 20s...
@@ -153,6 +153,59 @@ exports.getThumbnailPresignedUrl = async (req, res) => {
         });
     } catch (error) {
         console.error("THUMBNAIL PRESIGNED URL ERROR:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.retryUpload = async (req, res) => {
+    try {
+        const userId = req.headers["x-user-id"];
+        const { uploadId } = req.body;
+
+        if (!userId || !uploadId) {
+            return res.status(400).json({ success: false, message: "userId and uploadId are required" });
+        }
+
+        // 1. Get Session
+        const session = await uploadService.getUploadSession(uploadId);
+        if (!session) {
+            return res.status(404).json({ success: false, message: "Upload session not found" });
+        }
+
+        // 2. Check if it's actually failed
+        if (session.status !== "failed") {
+            return res.status(400).json({ success: false, message: `Cannot retry a session with status: ${session.status}` });
+        }
+
+        // 3. Reconstruct the original Location (raw S3 URL) for the worker
+        const s3Key = `raw-uploads/${uploadId}-${session.fileName}`;
+        const originalLocation = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+
+        // 4. Reset statuses to trigger UI spinner
+        await uploadService.updateUploadSessionStatus(uploadId, "processing");
+        await feedService.updatePostStatusByUploadId(uploadId, "processing");
+
+        // 5. Re-add to Queue
+        await videoQueue.add("process-video", {
+            uploadId,
+            s3Key,
+            originalLocation: originalLocation,
+            thumbnailUrl: null, // Worker will regenerate if null
+        }, {
+            attempts: MAX_ATTEMPTS,
+            backoff: {
+                type: "exponential",
+                delay: 5000,
+            },
+        });
+
+        res.json({
+            success: true,
+            message: "Retry initiated. Video is processing again.",
+        });
+
+    } catch (error) {
+        console.error("RETRY UPLOAD ERROR:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
