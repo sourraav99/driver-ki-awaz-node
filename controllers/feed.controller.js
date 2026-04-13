@@ -169,7 +169,9 @@ exports.createPost = async (req, res) => {
       media_url,
       caption,
       category,
-      thumbnail
+      thumbnail,
+      null, // No upload session ID for direct uploads
+      "ready" // Status is ready immediately
     );
 
     res.json({

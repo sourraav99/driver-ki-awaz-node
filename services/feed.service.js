@@ -1,9 +1,9 @@
 const db = require("../config/db");
 
-exports.createPost = async (userId, media_type, media_url, caption, category, thumbnail, uploadId) => {
+exports.createPost = async (userId, media_type, media_url, caption, category, thumbnail, uploadId, processingStatus = "pending") => {
   await db.query(
-    "INSERT INTO posts (user_id, upload_id, media_type, media_url, caption, category, thumbnail, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    [userId, uploadId, media_type, media_url, caption, category, thumbnail, 0]
+    "INSERT INTO posts (user_id, upload_id, media_type, media_url, caption, category, thumbnail, status, processing_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [userId, uploadId, media_type, media_url, caption, category, thumbnail, 0, processingStatus]
   );
 };
 
@@ -367,8 +367,10 @@ exports.getComments = async (userId, postId, cursor, lastId) => {
 };
 
 exports.updatePostStatusByUploadId = async (uploadId, status) => {
-  await db.query(
+  console.log("UPDATING POST STATUS:", { uploadId, status });
+  const [result] = await db.query(
     "UPDATE posts SET processing_status = ? WHERE upload_id = ?",
     [status, uploadId]
   );
+  console.log("UPDATE RESULT:", result);
 };

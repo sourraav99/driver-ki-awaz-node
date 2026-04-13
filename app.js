@@ -33,7 +33,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log("Server running on port " + port);
 });
+
+
+
+// npm i pm2
+// npx pm2 start npm --name "awaz" -- start
+// npx pm2 restart awaz
+// npx pm2 stop awaz
+// npx pm2 save
+// npx pm2 startup
+
+// add these as comment in app.js

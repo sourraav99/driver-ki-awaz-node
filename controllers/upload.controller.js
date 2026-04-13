@@ -94,7 +94,7 @@ exports.completeUpload = async (req, res) => {
         const initialMediaUrl = Location; 
         
         // If thumbnailUrl is provided by frontend, we use it, otherwise NULL
-        await feedService.createPost(userId, "video", initialMediaUrl, caption, category, thumbnailUrl || null, uploadId);
+        await feedService.createPost(userId, "video", initialMediaUrl, caption, category, thumbnailUrl || null, uploadId, "processing");
 
         // Trigger Background Processing via Queue with 3 retries
         await videoQueue.add("process-video", {
